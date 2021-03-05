@@ -1,0 +1,145 @@
+import time
+startTime = time.time()
+#|___IPS2> IPS2 
+#|___IPS2_A> METHOD A : ~PURE AUTO 
+#|___IPS2_A_DL> DoubleLoop periodic solutions
+#| Use Matlab-generated orbit at thetaP=2.91 once.
+print("=====2A_DDD===CONTINUE_MATLAB_ORBIT")
+l_dLoop_dat = load(
+    e="ZilliCubic11_datFileContin_zeta_1e-2_doubleLoop",
+    c="ZilliCubic11",
+    dat="onePeriodCycle_ISO_rot_2p91_zeta_1e-2_doubleLoop",
+    IPS=2, ICP=[2,11,9],
+    UZSTOP={2:[0.01,7.01]},
+    UZR={2:3.0},
+    DS=+0.005, DSMAX=0.005,
+    NTST=50,
+    EPSL= 1e-07, EPSU = 1e-07, EPSS =1e-4)
+dLoop_dat = run(l_dLoop_dat) # merge( run(l_dLoop_dat) +
+             #      run(l_dLoop_dat,DS="-") )
+
+#| Vary zeta at one of the tips of the periodic orbit.
+print("=====2A_DDD===SAMPLE_ZETA")
+l_dLoop_zeta = load(dLoop_dat('UZ1'),
+    IPS=2, ICP=[6,11,9],
+    UZR={6:[1e-5,0.0]},
+    RL0=-0.001,
+    NTST=200,
+    DS=+0.001, DSMAX=0.001) 
+    #|:Contin par6: zeta  #|1e-5 and 0.0 not sampled ??.
+
+dLoop_zeta = run(l_dLoop_zeta) #merge( run(l_dLoop_zeta) +
+              #      run(l_dLoop_zeta,DS="-") )
+
+#| To plot externally, export the data (Refer to AUTO doc), FAIL YET
+dLoop_zeta.writeRawFilename("myASCIIoutputFile") #|Fail
+myArray = dLoop_zeta.toArray()
+print("!!!!!!!!!!!size of myArray is, ", len(myArray[0]), len(myArray) )
+with open("myDummFile.txt","w",encoding="utf-8") as f:
+  for r in myArray:
+    for q in r:
+      f.write(str(r)+"\n")
+
+#| Run all different zetaOrbits made right above.
+print("=====2A_DDD===DIFFERENT_ZETA_RUNS_STARTED")
+counter = 0
+for Z in dLoop_zeta('UZ'):
+    counter+=1
+    print( "=====2A_DDD===ZETA_RUN:",counter,"/",len(dLoop_zeta('UZ')) )
+    try: 
+        IPS2 = IPS2 + run(Z,
+            IPS=2,ICP=[2,11,9],
+            DS=-0.005,DSMAX=0.005,
+            UZR={2:[2.3045]},
+            UZSTOP={2:[0.01,7.01]})
+    except: 
+        IPS2 = run(Z,
+            IPS=2,ICP=[2,11,9],
+            DS=-0.005,DSMAX=0.005,
+            UZR={2:[2.3045]},
+            UZSTOP={2:[0.01,7.01]})
+
+#|___IPS2_A_DL_HOMOT> eH Homotopy 
+l_eH_homot = load(IPS2("LP1"),
+	ICP=[5,11,9],
+    NMX=2000,NTST=500, 
+    RL0=0.01,RL1=1.0, # RL0=0.09
+    DS=-0.003,DSMAX=0.005,  
+    UZR={5:[0.05]})
+eH_homot = run(l_eH_homot)
+l_low_eH_bd = load(eH_homot("UZ1"),
+	ICP=[2,11,9],
+	 NMX=2000,NTST=500, 
+    RL0=0.01,RL1=10.0, # RL0=0.09
+    DS=+0.002,DSMAX=0.005  )
+low_eH_bd = merge(run(l_low_eH_bd) + run(l_low_eH_bd,DS="-"))
+IPS2 = IPS2 + low_eH_bd 
+
+#|___IPS2_A_DL_HOMOT_ZETA-FOLD>
+# print("I AM HERE !")
+# l_t = run(low_eH_bd("LP1"),ISW=2,ICP=[6,2,11,9],RL0=-1,RL1=5)
+# t = run(l_t)
+# IPS2 += t
+#|___IPS2_A_DL_HOMOT_ZETA-FOLD.
+
+#|___IPS2_A_DL_EH> eH-foldContinuation
+print("=====EEE===eH-foldContinuation")
+#| Load the fold continuation with run(), not load()
+x = run(IPS2("LP1"),
+    ICP=[5,2,11,9],
+    ISW=2,
+    NMX=2000,NTST=500, 
+    RL0=0.01,RL1=1.0, # RL0=0.09
+    UZR={5:[0.092,0.4]})  #|free() error below 0.092 !!!??? 
+
+eH_fold = merge(run(x) + run(x,DS="-"))
+plot(eH_fold,stability=True,height=600)
+save(eH_fold,"eH_fold")
+
+#| Family of sol form user point on eH-foldContinuation
+print("=====EEE===Family of sol from user point on eH-foldContin")
+y = load(eH_fold("UZ1"),     
+    c='ZilliCubic11',
+    IPS=2,ICP=[2,11,9],
+    NTST=200,
+    UZR={2:[1,2]},
+    UZSTOP={2:[0.01,7.01]})
+
+low_eH_bd_fold = merge( run(y) + run(y,DS="-") )
+IPS2 = IPS2 + low_eH_bd_fold
+
+
+
+
+#| Switching the branch of the fold continuation
+for BP in eH_fold("BP"):
+	eH_fold = eH_fold + run(BP,ISW=-1,ICP=[5,2,11,9],RL0=0.01,RL1=1.1) 
+plot(eH_fold)
+
+#|___IPS2_A_DL_EH.
+#|___IPS2_A_DL.
+#|___IPS2_A. METHOD A
+#|___IPS2.
+
+
+#|___HHH WHOLE DIAGRAM 
+print("=====HHH___RELABEL___PLOT___SAVE")
+try:all_sideStudy1 = rl( eH_fold + IPS2 )
+except:all_sideStudy1 = rl( IPS2 )
+p=plot(all_sideStudy1,
+    stability=True,
+    bifurcation_x="Omeg",
+    bifurcation_y="Amplitude",
+    solution_x="u",
+    solution_y="v",
+    height=600)
+p.config(color_list="black red green blue \
+                     orange gray brown teal purple turquoise violet")
+save(all_sideStudy1,"all_sideStudy1")
+
+endTime = time.time()
+elapsedTime = endTime-startTime
+print( "=====FINISH___elapsedTime: ",
+    elapsedTime,    " sec"," | ",
+    elapsedTime/60, " min" )
+#|___HHH END WHOLE DIAGRAM
